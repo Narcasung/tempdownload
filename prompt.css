@@ -8,6 +8,9 @@
   --accent: #2a78d6;
   --danger: #b3261e;
   --danger-bg: #fdeceb;
+  --caution: #7a5300;
+  --caution-bg: #fdf4e0;
+  --caution-border: #e3c169;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,6 +23,9 @@
     --accent: #5a9ff0;
     --danger: #f2b8b5;
     --danger-bg: #3a2422;
+    --caution: #f0cf85;
+    --caution-bg: #332a17;
+    --caution-border: #6b5629;
   }
 }
 
@@ -117,6 +123,42 @@ input[type="text"]:focus-visible {
   border: 1px solid var(--danger);
   background: var(--danger-bg);
   color: var(--danger);
+}
+
+/* Same shape as .alert, one step down in severity: nothing is broken, there is
+   just something left on disk that only the user can remove. */
+.caution {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--caution-border);
+  background: var(--caution-bg);
+  color: var(--caution);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Enough names to recognise the folder's contents, not enough to turn the
+   popup into a scrolling list. */
+.caution .files {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 96px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+.caution .row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.caution button {
+  padding: 2px 10px;
+  border-color: var(--caution-border);
+  background: transparent;
+  color: var(--caution);
 }
 
 code {

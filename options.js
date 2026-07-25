@@ -9,6 +9,10 @@ const preview = document.getElementById("preview");
 const status = document.getElementById("status");
 const setupAlert = document.getElementById("setupAlert");
 const askWarning = document.getElementById("askWarning");
+const orphanWarning = document.getElementById("orphanWarning");
+const orphanText = document.getElementById("orphanText");
+const orphanList = document.getElementById("orphanList");
+const orphanDismiss = document.getElementById("orphanDismiss");
 const clearButton = document.getElementById("clear");
 const changeButton = document.getElementById("change");
 const saveButton = document.getElementById("save");
@@ -69,14 +73,49 @@ function render() {
     : `Files go to ${path}`;
 }
 
+const baseName = (path) => String(path ?? "").split(/[\\/]/).pop();
+
+// How many names fit before the list stops being readable at a glance.
+const ORPHANS_SHOWN = 8;
+
+// Files the extension put in a temp folder and can no longer delete, because
+// the browser dropped their download history entry. Nothing here can check
+// whether they are really still on disk, hence "may".
+function renderOrphans(orphans) {
+  const files = Array.isArray(orphans) ? orphans : [];
+  orphanWarning.hidden = !files.length || needsSetup;
+  if (!files.length) return;
+
+  const count = files.length;
+  orphanText.textContent =
+    `${count} file${count > 1 ? "s" : ""} may still be in your temp folder. ` +
+    "Your browser stopped tracking them, which happens when download history " +
+    "is cleared, so this extension cannot delete them. Remove them yourself " +
+    "if you want the folder empty.";
+
+  orphanList.textContent = "";
+  for (const path of files.slice(0, ORPHANS_SHOWN)) {
+    const li = document.createElement("li");
+    li.textContent = baseName(path);
+    li.title = path;
+    orphanList.appendChild(li);
+  }
+  if (count > ORPHANS_SHOWN) {
+    const li = document.createElement("li");
+    li.textContent = `and ${count - ORPHANS_SHOWN} more`;
+    orphanList.appendChild(li);
+  }
+}
+
 chrome.storage.local.get(
-  { folder: DEFAULT_FOLDER, configured: false, askWhereWarning: false },
+  { folder: DEFAULT_FOLDER, configured: false, askWhereWarning: false, orphans: [] },
   (stored) => {
     saved = sanitize(stored.folder) || DEFAULT_FOLDER;
     needsSetup = !stored.configured;
     input.value = saved;
     // Redundant next to the setup instruction, which says the same thing.
     askWarning.hidden = !stored.askWhereWarning || needsSetup;
+    renderOrphans(stored.orphans);
     setEditing(needsSetup);
   }
 );
@@ -84,8 +123,20 @@ chrome.storage.local.get(
 // The detection happens in the background as downloads complete, so the page
 // has to react while it is open.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !changes.askWhereWarning) return;
-  askWarning.hidden = !changes.askWhereWarning.newValue || needsSetup;
+  if (area !== "local") return;
+  if (changes.askWhereWarning) {
+    askWarning.hidden = !changes.askWhereWarning.newValue || needsSetup;
+  }
+  // "Clear now" runs a sweep, which is also what finds untracked files, so the
+  // list can appear while the page is open.
+  if (changes.orphans) renderOrphans(changes.orphans.newValue);
+});
+
+// The files are beyond reach, so dismissing is the only thing left to do about
+// them. Anything found by a later sweep comes back.
+orphanDismiss.addEventListener("click", () => {
+  chrome.storage.local.set({ orphans: [] });
+  orphanWarning.hidden = true;
 });
 
 input.addEventListener("input", () => {

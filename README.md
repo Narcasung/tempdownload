@@ -13,8 +13,7 @@ A Manifest V3 extension for Chromium based browsers that brings a choice when do
 **1. Turn off "Ask where to save each file before downloading"** in your
 browser's download settings.
 
-**2. Pick a temp folder name.** Click the toolbar icon, type a name, and save.
-The folder is created inside your browser's download directory.
+**2. Pick a temp folder name.** The folder will be in your browser's download directory.
 
 ## Permissions
 
@@ -26,7 +25,7 @@ code.
 
 ## Known limits
 
+- The temp folder cannot be outside of the browser's download directory.
 - Only files still present in the browser's download history can be swept.
   Anything you clear from history survives in the temp folder.
-- The extension will not open files for you. Opening a download from an
-  extension requires a user gesture the background worker cannot provide.
+- The extension will not open files for you.

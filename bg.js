@@ -331,6 +331,86 @@ function flagPicker(detected, why) {
   chrome.storage.local.set({ askWhereWarning: detected });
 }
 
+// LEDGER
+//
+// The sweep can only reach downloads the browser still lists in its history.
+// Clearing browsing data erases those entries while the files themselves stay
+// on disk, out of reach of anything this extension can do. The ledger is what
+// makes that visible: every file sent to a temp folder is written down, and
+// anything still on the books but missing from the history at sweep time is
+// reported to the user, who is the only one left who can delete it.
+//
+// This is a record of what was put there, not a reading of the folder. An
+// extension cannot enumerate a directory, so files the user deleted by hand are
+// indistinguishable from files still sitting there. The wording in options.html
+// says "may" for that reason.
+
+const LEDGER_MAX = 500;
+const ORPHAN_MAX = 100;
+
+// storage.local offers no atomic read-modify-write and downloads settle in
+// parallel, so every change to the ledger goes through one chain.
+let ledgerQueue = Promise.resolve();
+
+function withLedger(mutate) {
+  ledgerQueue = ledgerQueue
+    .then(async () => {
+      const stored = await chrome.storage.local.get({ ledger: [], orphans: [] });
+      const next = mutate(stored);
+      if (next) await chrome.storage.local.set(next);
+    })
+    .catch((e) => console.warn("[tempdl] ledger update failed:", e.message));
+  return ledgerQueue;
+}
+
+// Driven by the download itself rather than by what the prompt decided, so a
+// service worker that was torn down and restarted in between still records the
+// file. Also catches downloads the user steered into the folder by hand.
+chrome.downloads.onChanged.addListener((delta) => {
+  const path = delta.filename?.current;
+  if (!path) return;
+
+  getConfig().then(({ configured, folder }) => {
+    if (!configured || !inFolder(path, folder)) return;
+    withLedger(({ ledger }) => {
+      const known = ledger.find((e) => e.id === delta.id);
+      // uniquify can rename the file after the fact, so a second event for the
+      // same download replaces the path rather than adding a row.
+      if (known?.path === path) return null;
+      const rest = ledger.filter((e) => e.id !== delta.id);
+      const at = known?.at ?? Date.now();
+      return { ledger: [...rest, { id: delta.id, path, at }].slice(-LEDGER_MAX) };
+    });
+  });
+});
+
+// Called with the history snapshot the sweep is about to act on, before any of
+// it is erased. `since` is when that snapshot was taken: ledger writes are
+// serialised, so a download that finished while this one waited its turn would
+// otherwise look missing from a history that simply predates it.
+function reconcileLedger(items, since) {
+  const live = new Map(items.map((i) => [i.id, i.state]));
+  const covered = (e) => (e.at ?? 0) <= since;
+
+  return withLedger(({ ledger, orphans }) => {
+    if (!ledger.length) return null;
+
+    // No history entry, and the sweep is not what removed it. The file is
+    // unreachable from here for good.
+    const lost = ledger.filter((e) => covered(e) && !live.has(e.id)).map((e) => e.path);
+    // Everything else is about to be swept, so it leaves the books either way.
+    // Exceptions: a download still running, which the sweep skips, and anything
+    // the snapshot never saw.
+    const kept = ledger.filter((e) => !covered(e) || live.get(e.id) === "in_progress");
+
+    if (!lost.length && kept.length === ledger.length) return null;
+    if (lost.length) console.warn("[tempdl]", lost.length, "temp file(s) left untracked");
+
+    const fresh = lost.filter((p) => !orphans.includes(p));
+    return { ledger: kept, orphans: [...orphans, ...fresh].slice(-ORPHAN_MAX) };
+  });
+}
+
 // Cancel, then erase. cancel() fails with "Download must be in progress" if it
 // arrives before the download has actually started, which is the common case
 // right after answering the prompt, so retry briefly. If it still loses the
@@ -400,7 +480,8 @@ chrome.runtime.onConnect.addListener((port) => {
 // an extension has no way to enumerate or delete arbitrary paths. Only
 // removeFile() on downloads the browser still knows about is available.
 // Consequence: anything whose history entry is gone (cleared browsing data, a
-// different profile) is left behind on disk, as is the folder itself.
+// different profile) is left behind on disk, as is the folder itself. What is
+// left behind cannot be deleted, but the ledger above at least names it.
 function sweep(reason) {
   const stored = chrome.storage.local.get({
     folder: DEFAULT_FOLDER,
@@ -421,6 +502,10 @@ function sweep(reason) {
         console.warn("[tempdl] sweep search failed", chrome.runtime.lastError.message);
         return;
       }
+
+      // Runs on the history as it stands, before the sweep starts erasing it,
+      // and whether or not there is anything to sweep.
+      reconcileLedger(items, Date.now());
 
       // A download still running is not litter, so leave it alone. Anything
       // else in a temp folder is expendable by definition.
