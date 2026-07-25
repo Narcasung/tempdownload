@@ -11,8 +11,9 @@ const setupAlert = document.getElementById("setupAlert");
 const askWarning = document.getElementById("askWarning");
 const orphanWarning = document.getElementById("orphanWarning");
 const orphanText = document.getElementById("orphanText");
-const orphanList = document.getElementById("orphanList");
+const orphanOpen = document.getElementById("orphanOpen");
 const orphanDismiss = document.getElementById("orphanDismiss");
+const openButton = document.getElementById("open");
 const clearButton = document.getElementById("clear");
 const changeButton = document.getElementById("change");
 const saveButton = document.getElementById("save");
@@ -51,6 +52,8 @@ function setEditing(on) {
   // Nothing has been downloaded to a temp folder yet, so there is nothing the
   // button could clear.
   clearButton.hidden = needsSetup;
+  // A name being typed does not point anywhere yet.
+  openButton.hidden = on;
   label.textContent = on ? "Choose a directory name" : "Temp folder";
   render();
   if (on) {
@@ -73,38 +76,21 @@ function render() {
     : `Files go to ${path}`;
 }
 
-const baseName = (path) => String(path ?? "").split(/[\\/]/).pop();
-
-// How many names fit before the list stops being readable at a glance.
-const ORPHANS_SHOWN = 8;
-
 // Files the extension put in a temp folder and can no longer delete, because
-// the browser dropped their download history entry. Nothing here can check
-// whether they are really still on disk, hence "may".
+// the browser dropped their download history entry. Only the count is shown:
+// nothing here can read the folder, so naming files that the user may well
+// have deleted by hand would claim more than is known.
 function renderOrphans(orphans) {
   const files = Array.isArray(orphans) ? orphans : [];
   orphanWarning.hidden = !files.length || needsSetup;
   if (!files.length) return;
 
   const count = files.length;
+  const many = count > 1;
   orphanText.textContent =
-    `${count} file${count > 1 ? "s" : ""} may still be in your temp folder. ` +
-    "Your browser stopped tracking them, which happens when download history " +
-    "is cleared, so this extension cannot delete them. Remove them yourself " +
-    "if you want the folder empty.";
-
-  orphanList.textContent = "";
-  for (const path of files.slice(0, ORPHANS_SHOWN)) {
-    const li = document.createElement("li");
-    li.textContent = baseName(path);
-    li.title = path;
-    orphanList.appendChild(li);
-  }
-  if (count > ORPHANS_SHOWN) {
-    const li = document.createElement("li");
-    li.textContent = `and ${count - ORPHANS_SHOWN} more`;
-    orphanList.appendChild(li);
-  }
+    `${count} orphaned file${many ? "s" : ""} ${many ? "have" : "has"} been detected in your temp folder. ` +
+    `That happens if you cleared your download history without deleting ${many ? "them" : "it"} first. ` +
+    `This extension cannot manage ${many ? "them" : "it"} anymore, and you will have to delete ${many ? "them" : "it"} manually.`;
 }
 
 chrome.storage.local.get(
@@ -128,12 +114,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
     askWarning.hidden = !changes.askWhereWarning.newValue || needsSetup;
   }
   // "Clear now" runs a sweep, which is also what finds untracked files, so the
-  // list can appear while the page is open.
+  // warning can appear while the page is open.
   if (changes.orphans) renderOrphans(changes.orphans.newValue);
 });
 
-// The files are beyond reach, so dismissing is the only thing left to do about
-// them. Anything found by a later sweep comes back.
+// The files are beyond reach, so acknowledging them is the only thing left to
+// do. Permanent for those files: they left the ledger when they were detected,
+// so no later sweep can find them again. Files orphaned after this still show
+// up, since each one is only ever reported once.
 orphanDismiss.addEventListener("click", () => {
   chrome.storage.local.set({ orphans: [] });
   orphanWarning.hidden = true;
@@ -169,6 +157,37 @@ changeButton.addEventListener("click", () => {
 });
 
 saveButton.addEventListener("click", save);
+
+// Must match inFolder() in bg.js. Windows paths are case-insensitive.
+function inFolder(path, folder) {
+  return String(path ?? "")
+    .split(/[\\/]/)
+    .some((seg) => seg.toLowerCase() === folder.toLowerCase());
+}
+
+// No API takes a path, so the folder can only be reached through a download
+// that is still in the history: show() opens the folder that file sits in,
+// which is the temp folder itself. Once a sweep has erased those entries there
+// is nothing left to point at, which is the normal state right after a browser
+// start, and the download directory one level up is the closest the browser
+// will go. The fallback is not an error, so it does not read like one. It also
+// does not claim the folder is empty: untracked files may well be sitting in
+// it, which is the whole point of the warning above.
+function openTempFolder() {
+  chrome.downloads.search({ orderBy: ["-startTime"] }, (items) => {
+    const hit = (items || []).find((i) => i.exists !== false && inFolder(i.filename, saved));
+    if (hit) {
+      chrome.downloads.show(hit.id);
+      status.textContent = "";
+      return;
+    }
+    chrome.downloads.showDefaultFolder();
+    status.textContent = `Showing your download folder. ${saved} is inside it.`;
+  });
+}
+
+openButton.addEventListener("click", openTempFolder);
+orphanOpen.addEventListener("click", openTempFolder);
 
 clearButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "tempdl-sweep" });

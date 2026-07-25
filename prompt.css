@@ -92,6 +92,20 @@ body.prompt {
   font-weight: 600;
 }
 
+/* The name and the button share a line. Only one of the name field and the
+   read-only view is on screen at a time, and either one takes the free space. */
+.field .row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.field .row .file,
+.field .row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
 input[type="text"] {
   font: inherit;
   padding: 6px 8px;
@@ -139,19 +153,11 @@ input[type="text"]:focus-visible {
   gap: 6px;
 }
 
-/* Enough names to recognise the folder's contents, not enough to turn the
-   popup into a scrolling list. */
-.caution .files {
-  margin: 0;
-  padding-left: 18px;
-  max-height: 96px;
-  overflow-y: auto;
-  overflow-wrap: anywhere;
-}
-
 .caution .row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .caution button {

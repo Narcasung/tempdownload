@@ -13,10 +13,15 @@
 
     <div class="field">
       <span class="label" id="label">Choose a directory name</span>
-      <div class="file" id="current" hidden>
-        <div class="name" id="currentName"></div>
+      <div class="row">
+        <div class="file" id="current" hidden>
+          <div class="name" id="currentName"></div>
+        </div>
+        <input id="folder" type="text" spellcheck="false" autocomplete="off" />
+        <button id="open" hidden title="Open this folder in your file manager">
+          Open
+        </button>
       </div>
-      <input id="folder" type="text" spellcheck="false" autocomplete="off" />
     </div>
 
     <p class="hint" id="preview"></p>
@@ -37,8 +42,8 @@
 
     <div class="caution" id="orphanWarning" hidden>
       <div id="orphanText"></div>
-      <ul class="files" id="orphanList"></ul>
       <div class="row">
+        <button id="orphanOpen">Open folder</button>
         <button id="orphanDismiss">Dismiss</button>
       </div>
     </div>
