@@ -9,6 +9,7 @@ const preview = document.getElementById("preview");
 const status = document.getElementById("status");
 const setupAlert = document.getElementById("setupAlert");
 const askWarning = document.getElementById("askWarning");
+const dirWarning = document.getElementById("dirWarning");
 const orphanWarning = document.getElementById("orphanWarning");
 const orphanText = document.getElementById("orphanText");
 const orphanOpen = document.getElementById("orphanOpen");
@@ -32,6 +33,21 @@ function sanitize(name) {
 let saved = DEFAULT_FOLDER;
 let editing = false;
 
+// The browser's download directory, learned in bg.js from the first download
+// seen. Empty until then, which is the case on a fresh install.
+let downloadDir = "";
+
+// Only the last segment of the download directory is shown. The full path is
+// mostly noise the user already knows, and the name alone is enough to tell
+// which folder is meant. Trailing separator included: it reads as a folder
+// rather than a file.
+function tempPath(folder) {
+  if (!downloadDir) return `<download folder>\\${folder}\\`;
+  const sep = downloadDir.includes("\\") ? "\\" : "/";
+  const name = downloadDir.split(/[\\/]/).filter(Boolean).pop() || downloadDir;
+  return `${name}${sep}${folder}${sep}`;
+}
+
 // Until a folder is saved the extension does nothing at all, so this page has
 // to keep asking. Setup is driven by that flag rather than by how the page was
 // opened: clicking the toolbar icon before setup is done shows setup too.
@@ -54,6 +70,9 @@ function setEditing(on) {
   clearButton.hidden = needsSetup;
   // A name being typed does not point anywhere yet.
   openButton.hidden = on;
+  // Only relevant while a folder is being decided on, which is the one moment
+  // the consequences of moving the download directory are worth reading about.
+  dirWarning.hidden = !on;
   label.textContent = on ? "Choose a directory name" : "Temp folder";
   render();
   if (on) {
@@ -70,10 +89,21 @@ function render() {
     preview.textContent = "Enter a folder name.";
     return;
   }
-  const path = `<your browser's download folder>\\${clean}\\`;
-  preview.textContent = editing
-    ? `Files will go to ${path}. The folder will be created on your first temp download.`
-    : `Files go to ${path}`;
+  // Built as nodes rather than a string so the path can be marked up. append()
+  // takes plain strings as text nodes, so nothing here interprets markup.
+  const path = document.createElement("code");
+  path.textContent = tempPath(clean);
+
+  preview.textContent = "";
+  if (editing) {
+    preview.append(
+      "Files will go to ",
+      path,
+      ". The folder will be created on your first temp download."
+    );
+    return;
+  }
+  preview.append("Files go to ", path);
 }
 
 // Files the extension put in a temp folder and can no longer delete, because
@@ -94,9 +124,16 @@ function renderOrphans(orphans) {
 }
 
 chrome.storage.local.get(
-  { folder: DEFAULT_FOLDER, configured: false, askWhereWarning: false, orphans: [] },
+  {
+    folder: DEFAULT_FOLDER,
+    configured: false,
+    askWhereWarning: false,
+    orphans: [],
+    downloadDir: "",
+  },
   (stored) => {
     saved = sanitize(stored.folder) || DEFAULT_FOLDER;
+    downloadDir = stored.downloadDir;
     needsSetup = !stored.configured;
     input.value = saved;
     // Redundant next to the setup instruction, which says the same thing.
@@ -116,12 +153,18 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // "Clear now" runs a sweep, which is also what finds untracked files, so the
   // warning can appear while the page is open.
   if (changes.orphans) renderOrphans(changes.orphans.newValue);
+  // A download starting while this page is open is what teaches the path on a
+  // fresh install, so the placeholder can be replaced live.
+  if (changes.downloadDir) {
+    downloadDir = changes.downloadDir.newValue || "";
+    render();
+  }
 });
 
 // The files are beyond reach, so acknowledging them is the only thing left to
-// do. Permanent for those files: they left the ledger when they were detected,
-// so no later sweep can find them again. Files orphaned after this still show
-// up, since each one is only ever reported once.
+// do. Final for those files: they left the ledger when they were detected, so
+// no later sweep can find them again. The next sweep clears the report anyway,
+// this only skips the wait.
 orphanDismiss.addEventListener("click", () => {
   chrome.storage.local.set({ orphans: [] });
   orphanWarning.hidden = true;

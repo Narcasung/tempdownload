@@ -8,6 +8,7 @@
   --accent: #2a78d6;
   --danger: #b3261e;
   --danger-bg: #fdeceb;
+  --code-bg: #e7e7e7;
   --caution: #7a5300;
   --caution-bg: #fdf4e0;
   --caution-border: #e3c169;
@@ -23,10 +24,18 @@
     --accent: #5a9ff0;
     --danger: #f2b8b5;
     --danger-bg: #3a2422;
+    --code-bg: #3a3b3f;
     --caution: #f0cf85;
     --caution-bg: #332a17;
     --caution-border: #6b5629;
   }
+}
+
+/* Any author display rule outranks the hidden attribute, which is only
+   display: none in the browser's own stylesheet. Every block on these pages is
+   toggled through that attribute, so it has to win. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -170,6 +179,12 @@ input[type="text"]:focus-visible {
 code {
   font-family: ui-monospace, Consolas, monospace;
   overflow-wrap: anywhere;
+  /* Monospace runs large next to the UI font at the same nominal size. */
+  font-size: 0.92em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--fg);
 }
 
 .status {

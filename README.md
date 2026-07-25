@@ -28,4 +28,5 @@ code.
 - The temp folder cannot be outside of the browser's download directory.
 - Only files still present in the browser's download history can be swept.
   Anything you clear from history survives in the temp folder.
+  Anything you put there manually will never be detected nor deleted.
 - The extension will not open files for you.

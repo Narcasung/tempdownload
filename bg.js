@@ -101,6 +101,25 @@ const inFolder = (path, folder) =>
 
 // PROMPT
 
+// No API reports the browser's download directory. It is only ever visible as
+// the parent of a settled temp file, so it is recorded when one lands. Kept
+// only so the options page can name a real folder instead of describing one.
+// Goes stale if the directory is moved in browser settings, and the next temp
+// download corrects it.
+function learnDownloadDir(path, folder) {
+  const parts = path.split(/[\\/]/);
+  const at = parts.findIndex((seg) => seg.toLowerCase() === folder.toLowerCase());
+  // Nothing above the temp folder means nothing to learn.
+  if (at <= 0) return;
+
+  const dir = parts.slice(0, at).join(path.includes("\\") ? "\\" : "/");
+  chrome.storage.local.get({ downloadDir: "" }, ({ downloadDir }) => {
+    if (downloadDir === dir) return;
+    console.log("[tempdl] download directory is", dir);
+    chrome.storage.local.set({ downloadDir: dir });
+  });
+}
+
 chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
   if (bypass.delete(item.url)) {
     console.log("[tempdl] bypass (save-as re-issue)", item.id);
@@ -338,7 +357,9 @@ function flagPicker(detected, why) {
 // on disk, out of reach of anything this extension can do. The ledger is what
 // makes that visible: every file sent to a temp folder is written down, and
 // anything still on the books but missing from the history at sweep time is
-// reported to the user, who is the only one left who can delete it.
+// reported to the user, who is the only one left who can delete it. Each file
+// is detected once, by the first sweep that misses it, and the report lasts
+// until the next sweep restates what it found.
 //
 // This is a record of what was put there, not a reading of the folder. An
 // extension cannot enumerate a directory, so files the user deleted by hand are
@@ -372,6 +393,10 @@ chrome.downloads.onChanged.addListener((delta) => {
 
   getConfig().then(({ configured, folder }) => {
     if (!configured || !inFolder(path, folder)) return;
+
+    // This is the one place a path inside the temp folder is known in full.
+    learnDownloadDir(path, folder);
+
     withLedger(({ ledger }) => {
       const known = ledger.find((e) => e.id === delta.id);
       // uniquify can rename the file after the fact, so a second event for the
@@ -393,8 +418,6 @@ function reconcileLedger(items, since) {
   const covered = (e) => (e.at ?? 0) <= since;
 
   return withLedger(({ ledger, orphans }) => {
-    if (!ledger.length) return null;
-
     // No history entry, and the sweep is not what removed it. The file is
     // unreachable from here for good.
     const lost = ledger.filter((e) => covered(e) && !live.has(e.id)).map((e) => e.path);
@@ -403,11 +426,18 @@ function reconcileLedger(items, since) {
     // the snapshot never saw.
     const kept = ledger.filter((e) => !covered(e) || live.get(e.id) === "in_progress");
 
-    if (!lost.length && kept.length === ledger.length) return null;
-    if (lost.length) console.warn("[tempdl]", lost.length, "temp file(s) left untracked");
+    // Each sweep restates what it found rather than adding to a running total,
+    // so a report the user has acted on does not outlive the sweep that follows
+    // it. Nothing here can see the folder, so this is the only way the warning
+    // ever goes away on its own.
+    const settled =
+      kept.length === ledger.length &&
+      lost.length === orphans.length &&
+      lost.every((path, i) => path === orphans[i]);
+    if (settled) return null;
 
-    const fresh = lost.filter((p) => !orphans.includes(p));
-    return { ledger: kept, orphans: [...orphans, ...fresh].slice(-ORPHAN_MAX) };
+    if (lost.length) console.warn("[tempdl]", lost.length, "temp file(s) left untracked");
+    return { ledger: kept, orphans: lost.slice(-ORPHAN_MAX) };
   });
 }
 
