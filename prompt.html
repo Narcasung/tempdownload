@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Download</title>
+    <link rel="stylesheet" href="prompt.css" />
+  </head>
+  <body class="prompt">
+    <p class="lead">What do you want to do with this file?</p>
+
+    <div class="file">
+      <div class="name" id="name"></div>
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <p class="lead hint">Temp downloads are deleted the next time your browser starts.</p>
+
+    <div class="actions">
+      <button id="temp" class="primary">Download (Temp)</button>
+      <button id="save">Save as&hellip;</button>
+      <button id="cancel">Cancel</button>
+    </div>
+
+    <script src="prompt.js"></script>
+  </body>
+</html>

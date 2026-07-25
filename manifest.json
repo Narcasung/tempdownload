@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "TempDownload",
+  "version": "1.0",
+  "description": "Temporary download handling: option to keep downloads in a temp folder that is cleared on every browser start.",
+  "permissions": ["downloads", "storage"],
+  "icons": {
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_title": "Temp folder settings",
+    "default_popup": "options.html",
+    "default_icon": {
+      "128": "icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "background": {
+    "service_worker": "bg.js"
+  }
+}

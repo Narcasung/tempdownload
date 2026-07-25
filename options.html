@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Temporary folder</title>
+    <link rel="stylesheet" href="prompt.css" />
+  </head>
+  <body class="options">
+    <p class="lead" id="intro" hidden>
+      Downloads you mark as temporary are kept in a folder of their own, and
+      deleted every time your browser starts.
+    </p>
+
+    <div class="field">
+      <span class="label" id="label">Choose a directory name</span>
+      <div class="file" id="current" hidden>
+        <div class="name" id="currentName"></div>
+      </div>
+      <input id="folder" type="text" spellcheck="false" autocomplete="off" />
+    </div>
+
+    <p class="hint" id="preview"></p>
+
+    <p class="alert" id="setupAlert" hidden>
+      &ldquo;Ask where to save each file before downloading&rdquo; in your
+      browser&rsquo;s download settings need to be turned off for this extension
+      to work correctly.
+    </p>
+
+    <p class="alert" id="askWarning" hidden>
+      An abnormal download behavior was detected. This can happen if &ldquo;Ask
+      where to save each file before downloading&rdquo; is enabled in your
+      browser&rsquo;s download settings. Turn it off, otherwise this extension
+      won't work correctly.
+    </p>
+
+    <p class="warn">
+      This folder is created inside your browser&rsquo;s download directory. If
+      you change this download directory later in your browser&rsquo;s settings,
+      the old temp folder will be <b>orphaned</b>. This extension will no longer
+      be able to find it or clear it, and its contents stay on disk until you
+      delete them yourself.
+    </p>
+
+    <div class="actions">
+      <span class="status" id="status"></span>
+      <button id="clear">Clear now</button>
+      <button id="change" hidden>Change temp folder</button>
+      <button id="save" class="primary">Save</button>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>
