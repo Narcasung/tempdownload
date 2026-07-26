@@ -1,0 +1,3 @@
+# Illustrator writes its exports here on every save. icon-master.png is the
+# copy that matters, so the scratch ones stay out of the repo.
+icontemp*.png
