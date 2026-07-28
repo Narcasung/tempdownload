@@ -6,16 +6,18 @@
     <link rel="stylesheet" href="prompt.css" />
   </head>
   <body class="options">
+    <header class="titlebar">
+      <img class="brand" src="icon48.png" alt="" />
+      <span class="title">TempDownload</span>
+    </header>
+
     <p class="lead" id="intro" hidden>
       Downloads you mark as temporary are kept in a folder of their own, and
       deleted every time your browser starts.
     </p>
 
     <div class="field">
-      <div class="titlebar">
-        <img class="brand" src="icon48.png" alt="" />
-        <span class="label" id="label">Choose a directory name</span>
-      </div>
+      <span class="label" id="label">Choose a directory name</span>
       <div class="row">
         <div class="current" id="current" hidden></div>
         <input id="folder" type="text" spellcheck="false" autocomplete="off" />
@@ -58,11 +60,12 @@
     </p>
 
     <div class="actions">
-      <span class="status" id="status"></span>
       <button id="clear">Clear now</button>
       <button id="change" hidden>Change temp folder</button>
       <button id="save" class="primary">Save</button>
     </div>
+
+    <p class="status" id="status"></p>
 
     <script src="options.js"></script>
   </body>

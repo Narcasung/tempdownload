@@ -71,7 +71,7 @@ function setEditing(on) {
   // Only relevant while a folder is being decided on, which is the one moment
   // the consequences of moving the download directory are worth reading about.
   dirWarning.hidden = !on;
-  label.textContent = on ? "Choose a directory name" : "Temp Download";
+  label.textContent = on ? "Choose a directory name:" : "Temporary Folder:";
   render();
   if (on) {
     input.focus();

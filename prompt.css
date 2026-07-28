@@ -55,12 +55,18 @@ body {
   margin: 0;
 }
 
-/* The mark leads the line that titles each page. Drawn from the 48px asset so
-   it stays sharp on a scaled display. */
+/* Every page opens with the same header, so a popup that appears on its own is
+   always identifiable. Whatever that page is actually asking follows below it.
+   The mark is drawn from the 48px asset so it stays sharp on a scaled display. */
 .titlebar {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .brand {
@@ -209,11 +215,17 @@ code {
   color: var(--fg);
 }
 
+/* A line of its own under the buttons, so a long message wraps freely instead
+   of squeezing them. */
 .status {
-  margin-right: auto;
+  margin: 0;
   color: var(--muted);
-  align-self: center;
   overflow-wrap: anywhere;
+}
+
+/* No message means no line, and no gap left behind by one. */
+.status:empty {
+  display: none;
 }
 
 .actions {
