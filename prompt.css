@@ -55,6 +55,20 @@ body {
   margin: 0;
 }
 
+/* The mark leads the line that titles each page. Drawn from the 48px asset so
+   it stays sharp on a scaled display. */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
 .file {
   background: var(--panel);
   border: 1px solid var(--border);
