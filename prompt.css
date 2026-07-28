@@ -109,10 +109,18 @@ body.prompt {
   gap: 8px;
 }
 
-.field .row .file,
+.field .row .current,
 .field .row input[type="text"] {
   flex: 1;
   min-width: 0;
+}
+
+/* Settled, the folder is a fact to read rather than a field to edit, so it is
+   shown as the path it produces and nothing suggests it is typed into. */
+.current {
+  display: flex;
+  align-items: center;
+  overflow-wrap: anywhere;
 }
 
 input[type="text"] {

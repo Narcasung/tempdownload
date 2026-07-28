@@ -4,7 +4,6 @@ const input = document.getElementById("folder");
 const intro = document.getElementById("intro");
 const label = document.getElementById("label");
 const current = document.getElementById("current");
-const currentName = document.getElementById("currentName");
 const preview = document.getElementById("preview");
 const status = document.getElementById("status");
 const setupAlert = document.getElementById("setupAlert");
@@ -37,15 +36,14 @@ let editing = false;
 // seen. Empty until then, which is the case on a fresh install.
 let downloadDir = "";
 
-// Only the last segment of the download directory is shown. The full path is
-// mostly noise the user already knows, and the name alone is enough to tell
-// which folder is meant. Trailing separator included: it reads as a folder
+// The full download directory, since the path is the thing the user goes
+// looking for. Until a temp download has taught it, there is nothing to show
+// but a description of it. Trailing separator included: it reads as a folder
 // rather than a file.
 function tempPath(folder) {
   if (!downloadDir) return `<download folder>\\${folder}\\`;
   const sep = downloadDir.includes("\\") ? "\\" : "/";
-  const name = downloadDir.split(/[\\/]/).filter(Boolean).pop() || downloadDir;
-  return `${name}${sep}${folder}${sep}`;
+  return `${downloadDir}${sep}${folder}${sep}`;
 }
 
 // Until a folder is saved the extension does nothing at all, so this page has
@@ -65,15 +63,15 @@ function setEditing(on) {
   // The instruction is worth stating up front during setup. Afterwards it is
   // only shown if a download actually proved the setting is on.
   setupAlert.hidden = !needsSetup;
-  // Nothing has been downloaded to a temp folder yet, so there is nothing the
-  // button could clear.
-  clearButton.hidden = needsSetup;
-  // A name being typed does not point anywhere yet.
+  // Both act on the folder as it stands, which a name being typed is not yet.
+  clearButton.hidden = on;
   openButton.hidden = on;
+  // Settled, the path is already shown in place of the field.
+  preview.hidden = !on;
   // Only relevant while a folder is being decided on, which is the one moment
   // the consequences of moving the download directory are worth reading about.
   dirWarning.hidden = !on;
-  label.textContent = on ? "Choose a directory name" : "Temp folder";
+  label.textContent = on ? "Choose a directory name" : "Temp Download";
   render();
   if (on) {
     input.focus();
@@ -83,27 +81,30 @@ function setEditing(on) {
 
 function render() {
   const clean = sanitize(editing ? input.value : saved);
-  currentName.textContent = saved;
+
+  // Built as nodes rather than a string so the path can be marked up. append()
+  // takes plain strings as text nodes, so nothing here interprets markup.
+  const path = document.createElement("code");
+  path.textContent = tempPath(clean || saved);
+
+  // Settled, the path takes the field's place. Nothing there is typed into, so
+  // nothing should look like it is, and repeating it underneath says it twice.
+  if (!editing) {
+    current.textContent = "";
+    current.appendChild(path);
+    return;
+  }
 
   if (!clean) {
     preview.textContent = "Enter a folder name.";
     return;
   }
-  // Built as nodes rather than a string so the path can be marked up. append()
-  // takes plain strings as text nodes, so nothing here interprets markup.
-  const path = document.createElement("code");
-  path.textContent = tempPath(clean);
-
   preview.textContent = "";
-  if (editing) {
-    preview.append(
-      "Files will go to ",
-      path,
-      ". The folder will be created on your first temp download."
-    );
-    return;
-  }
-  preview.append("Files go to ", path);
+  preview.append(
+    "Files will go to ",
+    path,
+    ". The folder will be created on your first temp download."
+  );
 }
 
 // Files the extension put in a temp folder and can no longer delete, because

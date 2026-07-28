@@ -14,9 +14,7 @@
     <div class="field">
       <span class="label" id="label">Choose a directory name</span>
       <div class="row">
-        <div class="file" id="current" hidden>
-          <div class="name" id="currentName"></div>
-        </div>
+        <div class="current" id="current" hidden></div>
         <input id="folder" type="text" spellcheck="false" autocomplete="off" />
         <button id="open" hidden title="Open this folder in your file manager">
           Open
@@ -24,7 +22,7 @@
       </div>
     </div>
 
-    <p class="hint" id="preview"></p>
+    <p class="hint" id="preview" hidden></p>
 
     <p class="alert" id="setupAlert" hidden>
       &ldquo;Ask where to save each file before downloading&rdquo; in your
