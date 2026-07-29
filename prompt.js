@@ -80,13 +80,38 @@ function showWaiting(count) {
 
 showWaiting(Number(params.get("count")) || 1);
 
+// An answer worth keeping, so the same question is not put again. Each box
+// needs something to key on: a blob URL has no host, and a name with no
+// extension has no type, so an offer that could not be honoured is not made.
+const remember = document.getElementById("remember");
+const rememberSite = document.getElementById("rememberSite");
+const rememberType = document.getElementById("rememberType");
+const rememberNote = document.getElementById("rememberNote");
+
+document.getElementById("siteRow").hidden = !host;
+document.getElementById("typeRow").hidden = !params.get("ext");
+remember.hidden = !host && !params.get("ext");
+
+// Said only once a box is ticked, since until then it answers a question
+// nobody asked.
+for (const box of [rememberSite, rememberType]) {
+  box.addEventListener("change", () => {
+    rememberNote.hidden = !(rememberSite.checked || rememberType.checked);
+  });
+}
+
 let sent = false;
 function choose(choice) {
   // The background closes this window on receipt. Guard against a double
   // click landing two choices on the same download.
   if (sent) return;
   sent = true;
-  chrome.runtime.sendMessage({ type: "tempdl-choice", id, choice });
+  chrome.runtime.sendMessage({
+    type: "tempdl-choice",
+    id,
+    choice,
+    remember: { host: rememberSite.checked, ext: rememberType.checked },
+  });
   // As a popup this closes itself; as a fallback window the background closes
   // it too, and whichever happens first is harmless.
   window.close();

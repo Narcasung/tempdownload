@@ -1,6 +1,6 @@
 # TempDownload
 
-A Manifest V3 extension for Chromium based browsers that brings a choice when downloading a file between saving it to disk or saving it to a temp folder that gets wiped on every restart, like firefox's "Open" choice.
+A Manifest V3 extension for Chromium based browsers that brings a choice when downloading a file between saving it to disk or saving it to a temp folder that gets wiped on every restart.
 
 ## Install
 
@@ -11,9 +11,9 @@ A Manifest V3 extension for Chromium based browsers that brings a choice when do
 ## Setup
 
 **1. Turn off "Ask where to save each file before downloading"** in your
-browser's download settings.
+browser's download settings. The extension will work anyway but will prompt a folder choice dialog when saving to the temp folder, defeating the purpose.
 
-**2. Pick a temp folder name.** The folder will be in your browser's download directory.
+**2. Pick a temp folder name.** The folder must be in your browser's download directory.
 
 ## Permissions
 
@@ -29,7 +29,7 @@ code.
 - Only files still present in the browser's download history can be swept.
   Anything you clear from history survives in the temp folder.
   Anything you put there manually will never be detected nor deleted.
-- Downloads have a set 15 seconds timeout before being automatically accepted by the browser.
+- Downloads have a set 15 seconds timeout before being automatically accepted by the browser, it's an MV3 limit.
   To counteract this, the script sets a 14 seconds timeout before automatically cancelling downloads.
-- Blob downloads cannot be handled by the script's choose directory dialog.
+- Blob downloads cannot be handled by the script's folder choice dialog.
   They can only be saved in the download folder.

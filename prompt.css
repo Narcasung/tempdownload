@@ -82,6 +82,29 @@ body {
   flex: none;
 }
 
+/* A control that is only an icon: no frame until it is pointed at, so it sits
+   in the header without competing with the name beside it. */
+.icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon:hover {
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+/* Back sits where it points, at the start of the line. Anything else in a
+   header belongs at the far end, away from the name. */
+.titlebar .trailing {
+  margin-left: auto;
+}
+
 .file {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -220,6 +243,59 @@ input[type="text"]:focus-visible {
   border-color: var(--caution-border);
   background: transparent;
   color: var(--caution);
+}
+
+/* Offered just above the buttons, because it changes what pressing one of them
+   means. Muted, since the answer is the decision and this is only how long it
+   lasts. */
+.remember {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.check input {
+  margin: 0;
+  flex: none;
+}
+
+/* One remembered answer per line, with what it answers and the way to undo it.
+   Same panel as the file block: both are a fact being shown rather than a
+   control. */
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.rule-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rule-choice {
+  flex: none;
+  color: var(--muted);
 }
 
 /* How long is left before the download answers itself. Bled to the edges and

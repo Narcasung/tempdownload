@@ -13,6 +13,7 @@ const orphanWarning = document.getElementById("orphanWarning");
 const orphanText = document.getElementById("orphanText");
 const orphanOpen = document.getElementById("orphanOpen");
 const orphanDismiss = document.getElementById("orphanDismiss");
+const advancedButton = document.getElementById("advanced");
 const openButton = document.getElementById("open");
 const clearButton = document.getElementById("clear");
 const changeButton = document.getElementById("change");
@@ -66,6 +67,9 @@ function setEditing(on) {
   // Both act on the folder as it stands, which a name being typed is not yet.
   clearButton.hidden = on;
   openButton.hidden = on;
+  // Nothing can have been remembered before the first download, and setup has
+  // no room for a second page anyway.
+  advancedButton.hidden = on || needsSetup;
   // Settled, the path is already shown in place of the field.
   preview.hidden = !on;
   // Only relevant while a folder is being decided on, which is the one moment
@@ -209,6 +213,13 @@ function save() {
     setEditing(false);
   });
 }
+
+// The rules live on their own page rather than below the folder: they are read
+// when something needs undoing, which is rarely, and they would otherwise push
+// the settings down the popup every time one is added.
+advancedButton.addEventListener("click", () => {
+  location.replace("rules.html");
+});
 
 changeButton.addEventListener("click", () => {
   status.textContent = "";

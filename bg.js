@@ -85,9 +85,68 @@ function getConfig() {
     });
 }
 
+// RULES
+//
+// A remembered answer, so the same question is not put twice. Consulted before
+// anything is shown, because a rule that matches means no prompt at all, which
+// is the only way to spend none of the 15 second budget.
+//
+// Cancel is never remembered. A rule that killed downloads without asking would
+// look exactly like the extension being broken, and the way back would be a
+// page the user has no reason to open.
+let rulesCache = null;
+
+function getRules() {
+  if (rulesCache) return Promise.resolve(rulesCache);
+  return chrome.storage.local.get({ rules: null }).then(({ rules }) => {
+    rulesCache = { hosts: rules?.hosts ?? {}, exts: rules?.exts ?? {} };
+    return rulesCache;
+  });
+}
+
+// The last segment only, so archive.tar.gz is remembered as gz, which is what
+// the browser and the user both call it.
+function extOf(filename) {
+  const base = baseName(filename);
+  const at = base.lastIndexOf(".");
+  return at > 0 ? base.slice(at + 1).toLowerCase() : "";
+}
+
+// The host wins. Ticking the site box is the more deliberate of the two, and it
+// lets one site sit outside a broad rule on a file type without that rule
+// having to go.
+function matchRule(item, rules) {
+  const host = hostOf(item.url) || hostOf(item.finalUrl);
+  if (host && rules.hosts[host]) return { choice: rules.hosts[host], why: host };
+
+  const ext = extOf(item.filename);
+  if (ext && rules.exts[ext]) return { choice: rules.exts[ext], why: `.${ext}` };
+
+  return null;
+}
+
+// Written for the file the prompt named, which is what its checkboxes refer to,
+// even when the answer covered a batch.
+function rememberChoice(item, choice, remember) {
+  if (!item || choice === "cancel" || !remember) return;
+
+  const host = remember.host ? hostOf(item.url) || hostOf(item.finalUrl) : "";
+  const ext = remember.ext ? extOf(item.filename) : "";
+  if (!host && !ext) return;
+
+  getRules().then((rules) => {
+    const next = { hosts: { ...rules.hosts }, exts: { ...rules.exts } };
+    if (host) next.hosts[host] = choice;
+    if (ext) next.exts[ext] = choice;
+    console.log("[tempdl] remembered", choice, "for", [host, ext && `.${ext}`].filter(Boolean).join(", "));
+    chrome.storage.local.set({ rules: next });
+  });
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   configCache = null;
+  rulesCache = null;
 
   if (changes.configured?.newValue) clearSetupBadge();
   if (!changes.folder) return;
@@ -154,26 +213,41 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
       return;
     }
 
-    console.log("[tempdl] asking about", item.id, item.filename);
-    const entry = { suggest, item, windowId: null, timer: null, askedAt: Date.now() };
-    entry.timer = setTimeout(() => {
-      console.warn("[tempdl] no answer for", item.id, "cancelling");
-      // Resolve first: the prompt page unloads as it navigates, which would
-      // otherwise arrive as a dismissal and answer the download twice.
-      // Read before resolving, which clears what is showing.
-      const port = showing === null ? null : ports.get(showing);
-      resolveAll("cancel");
-
-      chrome.storage.local.set({ toast: { text: "Download timed out", at: Date.now() } });
-      port?.postMessage({ type: "tempdl-timeout" });
-    }, CHOICE_TIMEOUT_MS);
-    pending.set(item.id, entry);
-
-    showPrompt(item);
+    getRules().then((rules) => {
+      // Answered already, by a box ticked on some earlier download. Nothing is
+      // shown and no clock starts.
+      const rule = matchRule(item, rules);
+      if (rule) {
+        console.log("[tempdl] rule", rule.why, "answers", item.id, "with", rule.choice);
+        pending.set(item.id, { suggest, item, windowId: null, timer: null, askedAt: Date.now() });
+        resolve(item.id, rule.choice);
+        return;
+      }
+      ask(item, suggest);
+    });
   });
 
   return true; // suggest() will be called later
 });
+
+function ask(item, suggest) {
+  console.log("[tempdl] asking about", item.id, item.filename);
+  const entry = { suggest, item, windowId: null, timer: null, askedAt: Date.now() };
+  entry.timer = setTimeout(() => {
+    console.warn("[tempdl] no answer for", item.id, "cancelling");
+    // Resolve first: the prompt page unloads as it navigates, which would
+    // otherwise arrive as a dismissal and answer the download twice.
+    // Read before resolving, which clears what is showing.
+    const port = showing === null ? null : ports.get(showing);
+    resolveAll("cancel");
+
+    chrome.storage.local.set({ toast: { text: "Download timed out", at: Date.now() } });
+    port?.postMessage({ type: "tempdl-timeout" });
+  }, CHOICE_TIMEOUT_MS);
+  pending.set(item.id, entry);
+
+  showPrompt(item);
+}
 
 // An extension has exactly one popup, so simultaneous downloads cannot each get
 // a prompt. They are not queued either: a queue would ask about them one at a
@@ -194,6 +268,9 @@ function promptUrl(item) {
     // Temp and Cancel work on any download. Save as is the only branch that
     // needs the URL a second time, so the prompt is told whether to offer it.
     reissue: canReissue(item.url) ? "1" : "0",
+    // What the remember boxes would key on. Empty means there is nothing to
+    // remember by, so the box is not offered.
+    ext: extOf(item.filename),
     // How many downloads this one prompt is answering for.
     count: String(pending.size),
   });
@@ -579,7 +656,11 @@ function resolveAll(choice) {
 chrome.runtime.onMessage.addListener((msg) => {
   // The prompt speaks for everything waiting, whichever download it happens to
   // be showing, so the answer covers all of them.
-  if (msg?.type === "tempdl-choice") resolveAll(msg.choice);
+  if (msg?.type === "tempdl-choice") {
+    // Read before resolving, which empties the map.
+    rememberChoice(showing === null ? null : pending.get(showing)?.item, msg.choice, msg.remember);
+    resolveAll(msg.choice);
+  }
   if (msg?.type === "tempdl-sweep") sweep("manual");
 });
 
