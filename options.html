@@ -35,7 +35,35 @@
       </div>
     </div>
 
+    <!-- Where the files below are. The one fact about the folder worth reading
+         without going looking for it, so it sits on the front page and the page
+         behind the cog is left to the things that are set rather than read. -->
+    <div class="field">
+      <span class="label">Temporary Folder:</span>
+      <div class="row">
+        <div class="current" id="current"></div>
+        <button id="open" title="Open this folder in your file manager">Open</button>
+      </div>
+    </div>
+
+    <!-- What is in that folder right now. No heading of its own: it sits under
+         the path it is the contents of, and a second title would only name the
+         folder twice. Hidden along with the button that empties it when there
+         is nothing there, so the page stays blank when it has nothing to say.
+
+         The scroller and the frame are the same element, so the border stays
+         where it is drawn while the files move under it. -->
+    <div class="scroll tall dl-list" id="list" hidden></div>
+
     <p class="status" id="status"></p>
+
+    <!-- Its own line, directly above the button that writes it, so it is not
+         mistaken for whatever the line above last reported. -->
+    <p class="status" id="sweptStatus"></p>
+
+    <div class="actions" id="sweepRow" hidden>
+      <button id="clear">Clear all</button>
+    </div>
 
     <script src="options.js"></script>
   </body>

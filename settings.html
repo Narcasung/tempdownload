@@ -26,14 +26,16 @@
       to work correctly.
     </p>
 
+    <!-- No heading once the folder is settled: the front page names it, and a
+         title here would only say again what the path underneath it already is.
+         Setup is the exception, where the field is being filled in rather than
+         read and has to say what it wants. -->
     <div class="field">
-      <span class="label" id="label">Temporary Folder:</span>
+      <span class="label" id="label" hidden>Choose a directory name:</span>
       <div class="row">
         <div class="current" id="current" hidden></div>
         <input id="folder" type="text" spellcheck="false" autocomplete="off" />
-        <button id="open" hidden title="Open this folder in your file manager">
-          Open
-        </button>
+        <button id="change" hidden>Change temp folder</button>
       </div>
     </div>
 
@@ -48,8 +50,6 @@
     </p>
 
     <div class="actions inline">
-      <button id="clear">Clear now</button>
-      <button id="change" hidden>Change temp folder</button>
       <button id="save" class="primary">Save</button>
     </div>
 

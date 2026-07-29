@@ -11,8 +11,9 @@
 // no way to write to an arbitrary absolute location, which is why the temp
 // folder is configured as a NAME rather than picked as a path. See options.html.
 //
-// Nothing here launches files. The browser's own download button already opens
-// them, and doing it again from the popup would only be a second way in.
+// Nothing here launches files. The popup lists what is in the temp folder, but
+// only as a list: the browser's own download button already opens them, and
+// doing it again from here would only be a second way in.
 //
 // Cleanup goes through the download history, not the filesystem, so files whose
 // history entry is gone stay on disk. The File System Access API can read the
@@ -452,6 +453,11 @@ function resolve(id, choice) {
 
   console.log("[tempdl] choice", id, choice);
 
+  // A file is being kept, so what the last sweep took has been answered for and
+  // the report can go. Cancel is not an answer to it: nothing was downloaded, so
+  // nothing has taken the cleared files' place. See reportSweep().
+  if (choice !== "cancel") chrome.storage.local.remove("swept");
+
   // Answering suggest() asynchronously is legal because the listener returned
   // true; the download stays parked until this resolves.
   getConfig().then(({ folder }) => {
@@ -801,20 +807,66 @@ function sweep(reason) {
       );
       if (!stale.length) {
         console.log("[tempdl] sweep", reason, "found nothing to do");
+        reportSweep(reason, 0);
         return;
       }
       console.log("[tempdl] sweep", reason, stale.length, "item(s) in", folders.join(", "));
+
+      // Counted rather than assumed from the list above, because a file the
+      // user already deleted by hand is swept from the history all the same and
+      // claiming it was cleared would be claiming work nobody did.
+      let removed = 0;
+      let outstanding = stale.length;
 
       for (const item of stale) {
         chrome.downloads.removeFile(item.id, () => {
           // Already gone from disk (moved, deleted by hand) is the normal
           // case, not a failure. The history entry still needs erasing.
-          ignoreError();
-          chrome.downloads.erase({ id: item.id }, ignoreError);
+          const err = chrome.runtime.lastError;
+          if (err) console.debug("[tempdl]", err.message);
+          else removed++;
+          chrome.downloads.erase({ id: item.id }, () => {
+            ignoreError();
+            // The last one to come back is the only one that knows the total.
+            if (--outstanding === 0) reportSweep(reason, removed);
+          });
         });
       }
     });
   });
+}
+
+// What the sweep took. Not a toast: that reports a moment and goes stale on a
+// timer, and this answers "where did my files go", which is a question the user
+// may not think to ask until well after the browser started. So it is kept until
+// there is a new file to think about instead, which is the first download that
+// gets accepted. See resolve().
+//
+// A sweep that ran on its own says which session the files were from, because
+// the user did not ask for anything and has to be told what happened while they
+// were not looking. Pressing the button is its own explanation.
+// The button is the only sweep the user asked for, so it is the only one that
+// reads as something they did. Everything else ran on its own, whether that was
+// a browser start or an unpacked extension being reloaded, and both end a
+// session the same way: the files were taken while the user was not looking, so
+// the report says when.
+const asked = (reason) => reason === "manual";
+
+function reportSweep(reason, count) {
+  if (!count) {
+    // A sweep of its own that took nothing means the last session left nothing
+    // behind, so a report still on screen is about the session before that one
+    // and answers nothing. A button press that took nothing leaves the last
+    // report alone: the list emptying is answer enough, and the files it names
+    // are still gone.
+    if (!asked(reason)) chrome.storage.local.remove("swept");
+    return;
+  }
+
+  const files = `${count} file${count > 1 ? "s" : ""}`;
+  const text = asked(reason) ? `${files} cleared.` : `${files} cleared from last session.`;
+  console.log("[tempdl]", text);
+  chrome.storage.local.set({ swept: text });
 }
 
 // Setup lives in the toolbar popup rather than a window of its own. Opening it

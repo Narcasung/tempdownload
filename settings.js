@@ -16,8 +16,6 @@ const preview = document.getElementById("preview");
 const status = document.getElementById("status");
 const setupAlert = document.getElementById("setupAlert");
 const dirWarning = document.getElementById("dirWarning");
-const openButton = document.getElementById("open");
-const clearButton = document.getElementById("clear");
 const changeButton = document.getElementById("change");
 const saveButton = document.getElementById("save");
 
@@ -73,20 +71,21 @@ function setEditing(on) {
   input.hidden = !on;
   saveButton.hidden = !on;
   current.hidden = on;
+  // Acts on the folder as it stands, which a name being typed is not yet, so it
+  // takes the place of the field it would reopen.
   changeButton.hidden = on;
   intro.hidden = !needsSetup;
   // Worth stating up front during setup. Afterwards it is only worth saying if
   // a download actually proved the setting is on, which the front page reports.
   setupAlert.hidden = !needsSetup;
-  // Both act on the folder as it stands, which a name being typed is not yet.
-  clearButton.hidden = on;
-  openButton.hidden = on;
   // Settled, the path is already shown in place of the field.
   preview.hidden = !on;
   // Only relevant while a folder is being decided on, which is the one moment
   // the consequences of moving the download directory are worth reading about.
   dirWarning.hidden = !on;
-  label.textContent = on ? "Choose a directory name:" : "Temporary Folder:";
+  // Only while the field is open. Settled, the front page carries the heading
+  // and this one has nothing left to introduce.
+  label.hidden = !on;
   // Setup has nowhere to go back to: the front page would only send it here
   // again, so the arrow would look broken.
   document.getElementById("back").hidden = needsSetup;
@@ -303,39 +302,6 @@ changeButton.addEventListener("click", () => {
 });
 
 saveButton.addEventListener("click", save);
-
-// Must match inFolder() in bg.js. Windows paths are case-insensitive.
-function inFolder(path, folder) {
-  return String(path ?? "")
-    .split(/[\\/]/)
-    .some((seg) => seg.toLowerCase() === folder.toLowerCase());
-}
-
-// No API takes a path, so the folder can only be reached through a download
-// that is still in the history: show() opens the folder that file sits in,
-// which is the temp folder itself. Once a sweep has erased those entries there
-// is nothing left to point at, which is the normal state right after a browser
-// start, and the download directory one level up is the closest the browser
-// will go. The fallback is not an error, so it does not read like one.
-function openTempFolder() {
-  chrome.downloads.search({ orderBy: ["-startTime"] }, (items) => {
-    const hit = (items || []).find((i) => i.exists !== false && inFolder(i.filename, saved));
-    if (hit) {
-      chrome.downloads.show(hit.id);
-      status.textContent = "";
-      return;
-    }
-    chrome.downloads.showDefaultFolder();
-    status.textContent = `Showing your download folder. ${saved} is inside it.`;
-  });
-}
-
-openButton.addEventListener("click", openTempFolder);
-
-clearButton.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "tempdl-sweep" });
-  status.textContent = "Cleared.";
-});
 
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") save();

@@ -12,6 +12,7 @@
   --caution: #7a5300;
   --caution-bg: #fdf4e0;
   --caution-border: #e3c169;
+  --leaf: #3d7a41;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,6 +29,7 @@
     --caution: #f0cf85;
     --caution-bg: #332a17;
     --caution-border: #6b5629;
+    --leaf: #8ccf8c;
   }
 }
 
@@ -340,6 +342,14 @@ input[type="text"]:focus-visible {
   scrollbar-width: thin;
 }
 
+/* The front page is mostly this list, where the settings page fits one under a
+   folder field and a heading, so it is given the room the other one cannot
+   spare. Still short of what a popup is allowed, which leaves the warnings
+   above it somewhere to go. */
+.scroll.tall {
+  max-height: 280px;
+}
+
 .sublabel {
   color: var(--muted);
   font-weight: 600;
@@ -364,6 +374,50 @@ input[type="text"]:focus-visible {
 
 .rule-choice {
   flex: none;
+  color: var(--muted);
+}
+
+/* One panel with the files inside it, rather than a box drawn around each one.
+   A remembered rule is a thing in its own right and is framed like one; these
+   are lines of a single list, and framing them separately made a stack of cards
+   out of what should read as the contents of a folder. */
+.dl-list {
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+/* One temp file per line, a name and a size. Shallow: there is nothing to press
+   here, so nothing needs room to be pressed. */
+.dl {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px;
+}
+
+/* Between the lines rather than around them. Drawn on the follower so the last
+   row does not put a second border against the panel's own. */
+.dl + .dl {
+  border-top: 1px solid var(--border);
+}
+
+/* The name takes what the size leaves. min-width is what lets it: a flex item
+   will not shrink below its content otherwise, and a long file name would push
+   the size off the edge instead of wrapping. Not bold, unlike a rule name: a
+   list where every line is bold has no emphasis in it at all. */
+.dl-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Never wraps, and never gives ground to the name beside it: it is three or
+   four characters, and breaking them would cost more room than it saved. */
+.dl-size {
+  flex: none;
+  white-space: nowrap;
   color: var(--muted);
 }
 
@@ -410,6 +464,18 @@ code {
 
 .status.bad {
   color: var(--danger);
+}
+
+/* Sits at the end of the sweep report and says the same thing without a word:
+   the folder is fresh again. The one green on these pages, because it is the one
+   place nothing went wrong and nothing needs doing. The svg fills and strokes
+   with currentColor, so setting the colour here is what reaches it. */
+.leaf {
+  color: var(--leaf);
+  margin-left: 6px;
+  /* Taller than the line it sits on, so it is dropped until its blade is level
+     with the text rather than floating above it. */
+  vertical-align: -5px;
 }
 
 .actions {
