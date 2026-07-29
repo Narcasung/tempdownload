@@ -20,16 +20,26 @@
 
 const DEFAULT_FOLDER = "_Temp";
 
-// If the user never answers, fall back to the least destructive branch: put it
-// in the temp folder, where cleanup will reclaim it. Nothing is saved
-// permanently and nothing is lost outright.
-const CHOICE_TIMEOUT_MS = 120000;
+// If the user never answers, cancel. Nothing is written, which is the only
+// outcome that cannot leave a file somewhere it was never meant to be.
+//
+// This has to beat the browser to it. A held suggest() is not waited on
+// forever: measured at 15 seconds, after which the browser places the file in
+// the download directory itself and ignores any answer that arrives later. So
+// the window to decide is 15 seconds from the moment the download starts, not
+// from the moment its prompt is seen. That is why one prompt answers for every
+// download waiting rather than each getting a turn.
+const CHOICE_TIMEOUT_MS = 12000;
 
 // suggest() is a live callback, so it cannot be serialised to storage and this
 // map is unavoidably in-memory. A port held open by the prompt window keeps the
 // service worker alive while a decision is outstanding; see onConnect below.
 const pending = new Map(); // downloadId -> { suggest, item, windowId, timer }
 const byWindow = new Map(); // windowId -> downloadId
+
+// The port each prompt page opened, kept so the page can be told to stand down
+// when its download is answered for it rather than by it.
+const ports = new Map(); // downloadId -> port
 
 // URLs we are re-issuing for "Save as". The second download must not be
 // intercepted again, or it would prompt forever.
@@ -93,6 +103,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
   });
 });
 
+// Only an address the extension can fetch on its own can be downloaded a second
+// time. blob:, data: and filesystem: URLs are held by the page that made them
+// and die with it.
+const canReissue = (url) => /^https?:/i.test(url ?? "");
+
 // Windows paths are case-insensitive, so the comparison has to be too.
 const inFolder = (path, folder) =>
   (path ?? "")
@@ -137,10 +152,17 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
     }
 
     console.log("[tempdl] asking about", item.id, item.filename);
-    const entry = { suggest, item, windowId: null, timer: null };
+    const entry = { suggest, item, windowId: null, timer: null, askedAt: Date.now() };
     entry.timer = setTimeout(() => {
-      console.warn("[tempdl] no answer for", item.id, "defaulting to temp");
-      resolve(item.id, "temp");
+      console.warn("[tempdl] no answer for", item.id, "cancelling");
+      // Resolve first: the prompt page unloads as it navigates, which would
+      // otherwise arrive as a dismissal and answer the download twice.
+      // Read before resolving, which clears what is showing.
+      const port = showing === null ? null : ports.get(showing);
+      resolveAll("cancel");
+
+      chrome.storage.local.set({ toast: { text: "Download timed out", at: Date.now() } });
+      port?.postMessage({ type: "tempdl-timeout" });
     }, CHOICE_TIMEOUT_MS);
     pending.set(item.id, entry);
 
@@ -150,9 +172,14 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
   return true; // suggest() will be called later
 });
 
-// An extension has exactly one popup, so simultaneous downloads have to queue
-// and the popup's target page is swapped per prompt.
-const queue = [];
+// An extension has exactly one popup, so simultaneous downloads cannot each get
+// a prompt. They are not queued either: a queue would ask about them one at a
+// time while all of them are spending the same 15 seconds, so the later ones
+// would expire before their turn came. Worse, showing the next one means
+// openPopup(), which fails whenever the fallback window has focus, and every
+// prompt after that becomes another window.
+//
+// So there is one prompt, and it answers for everything waiting.
 let showing = null;
 
 function promptUrl(item) {
@@ -161,47 +188,67 @@ function promptUrl(item) {
     name: baseName(item.filename) || "download",
     size: String(item.totalBytes ?? item.fileSize ?? 0),
     host: hostOf(item.url) || hostOf(item.finalUrl) || "",
+    // Temp and Cancel work on any download. Save as is the only branch that
+    // needs the URL a second time, so the prompt is told whether to offer it.
+    reissue: canReissue(item.url) ? "1" : "0",
+    // How many downloads this one prompt is answering for.
+    count: String(pending.size),
   });
   return `prompt.html?${params}`;
 }
 
 function showPrompt(item) {
-  queue.push(item.id);
-  pump();
-}
-
-function pump() {
-  if (showing !== null) return;
-
-  const next = queue.shift();
-  if (next === undefined) {
-    // Nothing waiting, so the icon goes back to being the settings button.
-    chrome.action.setPopup({ popup: "options.html" });
-    chrome.action.setBadgeText({ text: "" });
+  // Already asking. The prompt on screen covers this download too, so it is
+  // told the new total rather than a second one being opened.
+  if (showing !== null) {
+    announce();
     return;
   }
 
-  const entry = pending.get(next);
-  if (!entry) {
-    // Timed out while queued behind another prompt.
-    pump();
-    return;
-  }
+  const entry = pending.get(item.id);
+  if (!entry) return;
 
-  showing = next;
-  chrome.action.setPopup({ popup: promptUrl(entry.item) });
-  // If the popup cannot be shown, the badge is what tells the user to click.
-  chrome.action.setBadgeText({ text: String(queue.length + 1) });
-  chrome.action.setBadgeBackgroundColor({ color: "#2a78d6" });
+  showing = item.id;
+  chrome.action.setPopup({ popup: promptUrl(item) });
+  announce();
 
   const opening = chrome.action.openPopup?.();
   if (!opening?.catch) return;
   opening.catch((e) => {
     // openPopup() rejects when no browser window is focused. Falling back to a
     // real window keeps the download from hanging until the timeout.
-    console.log("[tempdl] popup refused for", next, e.message, "using a window");
+    console.log("[tempdl] popup refused for", item.id, e.message, "using a window");
     openPromptWindow(entry);
   });
+}
+
+// The badge is what tells the user to click when the popup could not be opened.
+// The prompt itself is told too, so its wording keeps up with downloads that
+// started after it appeared.
+function announce() {
+  const count = pending.size;
+  chrome.action.setBadgeText({ text: count ? String(count) : "" });
+  chrome.action.setBadgeBackgroundColor({ color: "#2a78d6" });
+  if (showing !== null) ports.get(showing)?.postMessage({ type: "tempdl-count", count });
+}
+
+// How long the prompt has left. The first download to run out cancels the whole
+// batch, so the deadline that matters is the earliest one, not this page's own.
+// Measured rather than assumed: a prompt can be opened well after the download
+// it is asking about started, from the badge.
+function remainingMs() {
+  let soonest = Infinity;
+  for (const entry of pending.values()) {
+    soonest = Math.min(soonest, entry.askedAt + CHOICE_TIMEOUT_MS - Date.now());
+  }
+  return Number.isFinite(soonest) ? Math.max(0, soonest) : 0;
+}
+
+// Nothing left to ask about, so the icon goes back to being the settings button.
+function stopAsking() {
+  showing = null;
+  chrome.action.setPopup({ popup: "options.html" });
+  chrome.action.setBadgeText({ text: "" });
 }
 
 function openPromptWindow(entry) {
@@ -248,12 +295,8 @@ function resolve(id, choice) {
     chrome.windows.remove(windowId, ignoreError);
   }
 
-  if (showing === id) {
-    showing = null;
-    // Let the current popup finish closing before asking for the next one;
-    // openPopup() fails while one is still on screen.
-    setTimeout(pump, 150);
-  }
+  if (pending.size === 0) stopAsking();
+  else announce();
 
   console.log("[tempdl] choice", id, choice);
 
@@ -273,6 +316,19 @@ function resolve(id, choice) {
       // the temp folder would become the Save As dialog's starting location.
       // If the cancel below loses its race, abort() deletes the stray copy.
       entry.suggest();
+
+      // Re-issuing means fetching the URL again from here, which only works for
+      // an address this extension can actually reach. A blob URL belongs to the
+      // page that created it and is unreachable from another origin, so the
+      // second download fails, names itself after the blob's id, and the
+      // original is already gone. Letting the original finish puts the file in
+      // the download folder under its proper name, which is where "save as" was
+      // headed anyway, just without the chance to pick the folder.
+      if (!canReissue(entry.item.url)) {
+        console.warn("[tempdl] cannot re-issue", id, entry.item.url.slice(0, 32), "keeping the original");
+        return;
+      }
+
       bypass.add(entry.item.url);
       abort(id, () => {
         chrome.downloads.download({ url: entry.item.url, saveAs: true }, (newId) => {
@@ -294,6 +350,15 @@ function resolve(id, choice) {
       // temp folder out of the browser's last-used-directory memory.
       entry.suggest();
       abort(id);
+      return;
+    }
+
+    // Save as and Cancel still work on a file the browser placed early, since
+    // both act on the download rather than on where it was heading. Temp is the
+    // one that cannot: there is no API to move a finished download, so the file
+    // stays where the browser put it.
+    if (entry.lost) {
+      console.warn("[tempdl]", id, "already at", entry.lost, "and temp cannot move it");
       return;
     }
 
@@ -341,6 +406,23 @@ chrome.downloads.onChanged.addListener((delta) => {
     }
     flagPicker(false, `settled in ${elapsed}ms`);
   });
+});
+
+// A download still waiting on an answer should not be moving at all: suggest()
+// has not been called for it, so nothing has told the browser where to put it.
+// Anything logged here resolved without going through this extension.
+chrome.downloads.onChanged.addListener((delta) => {
+  const entry = pending.get(delta.id);
+  if (!entry || !delta.filename?.current) return;
+
+  // The browser ran out of patience and placed the file itself. Whatever is
+  // answered from here on cannot move it, so record that rather than let the
+  // answer look as though it took effect.
+  entry.lost = delta.filename.current;
+  console.warn(
+    "[tempdl] browser placed", delta.id, "itself after",
+    Date.now() - entry.askedAt, "ms at", delta.filename.current
+  );
 });
 
 // Recorded either way, so turning the setting back off clears the warning on
@@ -472,7 +554,7 @@ function abort(id, done = () => {}, tries = 0) {
 }
 
 // Closing the window without choosing is not a decision, so treat it as the
-// same safe default as the timeout.
+// same safe default as the timeout: nothing is written.
 chrome.windows.onRemoved.addListener((windowId) => {
   const id = byWindow.get(windowId);
   if (id == null) return;
@@ -480,11 +562,21 @@ chrome.windows.onRemoved.addListener((windowId) => {
   const entry = pending.get(id);
   if (entry) entry.windowId = null;
   console.log("[tempdl] prompt window closed without a choice", id);
-  resolve(id, "temp");
+  resolveAll("cancel");
 });
 
+// Snapshotted first: resolve() empties the map as it goes, and a download that
+// starts mid-loop was never part of what the user was answering about.
+function resolveAll(choice) {
+  const ids = [...pending.keys()];
+  console.log("[tempdl] choice", choice, "for", ids.length, "download(s)");
+  for (const id of ids) resolve(id, choice);
+}
+
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "tempdl-choice") resolve(msg.id, msg.choice);
+  // The prompt speaks for everything waiting, whichever download it happens to
+  // be showing, so the answer covers all of them.
+  if (msg?.type === "tempdl-choice") resolveAll(msg.choice);
   if (msg?.type === "tempdl-sweep") sweep("manual");
 });
 
@@ -494,11 +586,20 @@ chrome.runtime.onMessage.addListener((msg) => {
 // event, and clicking anywhere outside a popup closes it.
 chrome.runtime.onConnect.addListener((port) => {
   const id = Number(port.name.slice("prompt-".length));
+  if (Number.isFinite(id)) ports.set(id, port);
+
+  // The page cannot work out its own deadline: the clock started when the
+  // download did, which is before this page existed.
+  if (pending.has(id)) {
+    port.postMessage({ type: "tempdl-remaining", ms: remainingMs(), total: CHOICE_TIMEOUT_MS });
+  }
+
   port.onDisconnect.addListener(() => {
     ignoreError();
+    ports.delete(id);
     if (!Number.isFinite(id) || !pending.has(id)) return;
     console.log("[tempdl] prompt dismissed without a choice", id);
-    resolve(id, "temp");
+    resolveAll("cancel");
   });
 });
 

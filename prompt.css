@@ -204,6 +204,23 @@ input[type="text"]:focus-visible {
   color: var(--caution);
 }
 
+/* How long is left before the download answers itself. Bled to the edges and
+   sat on the bottom of the frame, where it reads as a status of the window
+   rather than as one more thing to attend to. */
+.countdown {
+  height: 3px;
+  margin: 4px -18px -16px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.countdown > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+}
+
 code {
   font-family: ui-monospace, Consolas, monospace;
   overflow-wrap: anywhere;

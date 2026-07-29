@@ -18,13 +18,23 @@
       <div class="meta" id="meta"></div>
     </div>
 
+    <p class="lead hint" id="batch" hidden></p>
+
     <p class="lead hint">Temp downloads are deleted the next time your browser starts.</p>
+
+    <p class="lead hint" id="noSaveAs" hidden>
+      This file was built by the page itself, so your browser cannot be asked
+      where to put it. Keep it temporarily, or cancel and use the page&rsquo;s own
+      download or save option.
+    </p>
 
     <div class="actions">
       <button id="temp" class="primary">Download (Temp)</button>
       <button id="save">Save as&hellip;</button>
       <button id="cancel">Cancel</button>
     </div>
+
+    <div class="countdown" id="countdown" hidden><span></span></div>
 
     <script src="prompt.js"></script>
   </body>

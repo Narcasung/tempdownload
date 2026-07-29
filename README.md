@@ -29,4 +29,8 @@ code.
 - Only files still present in the browser's download history can be swept.
   Anything you clear from history survives in the temp folder.
   Anything you put there manually will never be detected nor deleted.
-- The extension will not open files for you.
+- Downloads have a set 15 seconds timeout before being automatically accepted by the browser.
+  To counteract this, the script sets a 12 seconds timeout before automatically cancelling downloads.
+- Blob downloads cannot be handled by the script's choose directory dialog.
+  They can only be saved in the download folder.
+- The extension cannot open files for you.

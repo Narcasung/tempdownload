@@ -124,6 +124,17 @@ function renderOrphans(orphans) {
     `This extension cannot manage ${many ? "them" : "it"} anymore, and you will have to delete ${many ? "them" : "it"} manually.`;
 }
 
+// Left behind by the background when something happened while this page was
+// not the one on screen. Read once and dropped: it reports a moment, not a
+// state, and a stale one would be worse than none.
+const TOAST_MAX_AGE_MS = 60000;
+
+function showToast(toast) {
+  if (!toast?.text) return;
+  if (Date.now() - (toast.at ?? 0) > TOAST_MAX_AGE_MS) return;
+  status.textContent = toast.text;
+}
+
 chrome.storage.local.get(
   {
     folder: DEFAULT_FOLDER,
@@ -131,6 +142,7 @@ chrome.storage.local.get(
     askWhereWarning: false,
     orphans: [],
     downloadDir: "",
+    toast: null,
   },
   (stored) => {
     saved = sanitize(stored.folder) || DEFAULT_FOLDER;
@@ -141,6 +153,9 @@ chrome.storage.local.get(
     askWarning.hidden = !stored.askWhereWarning || needsSetup;
     renderOrphans(stored.orphans);
     setEditing(needsSetup);
+    // After setEditing, which renders and would clear the line again.
+    showToast(stored.toast);
+    if (stored.toast) chrome.storage.local.remove("toast");
   }
 );
 
