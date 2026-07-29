@@ -87,9 +87,26 @@ const remember = document.getElementById("remember");
 const rememberSite = document.getElementById("rememberSite");
 const rememberType = document.getElementById("rememberType");
 
+// Named rather than described. "This site" is ambiguous on a page that
+// redirected, and the extension keys on the host it actually saw, so the label
+// says which one that is, set as a text node because a host is whatever a page
+// called itself. The name is the part being agreed to, so it is marked up as
+// the literal it is rather than left to blend into the sentence.
+const ext = params.get("ext") || "";
+
+function label(node, value) {
+  const literal = document.createElement("code");
+  literal.textContent = value;
+  node.textContent = "Remember my choice for ";
+  node.appendChild(literal);
+}
+
+label(document.getElementById("typeLabel"), `.${ext}`);
+label(document.getElementById("siteLabel"), host);
+
 document.getElementById("siteRow").hidden = !host;
-document.getElementById("typeRow").hidden = !params.get("ext");
-remember.hidden = !host && !params.get("ext");
+document.getElementById("typeRow").hidden = !ext;
+remember.hidden = !host && !ext;
 
 let sent = false;
 function choose(choice) {

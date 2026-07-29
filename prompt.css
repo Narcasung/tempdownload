@@ -287,6 +287,9 @@ input[type="text"]:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  /* Set apart from the buttons: these change what pressing one means, and
+     sitting tight against them reads as part of the same row. */
+  margin-bottom: 8px;
 }
 
 .check {
@@ -300,6 +303,12 @@ input[type="text"]:focus-visible {
 .check input {
   margin: 0;
   flex: none;
+}
+
+/* A host name can be long and is not the extension's to shorten, so it wraps
+   rather than widening the popup. */
+.check span {
+  overflow-wrap: anywhere;
 }
 
 /* One remembered answer per line, with what it answers and the way to undo it.
