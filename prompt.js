@@ -95,6 +95,9 @@ const rememberType = document.getElementById("rememberType");
 // called itself. The name is the part being agreed to, so it is marked up as
 // the literal it is rather than left to blend into the sentence.
 const ext = params.get("ext") || "";
+// Not the host on the file line: that is the machine serving the bytes, and a
+// mirror is not the site a rule should be filed under.
+const site = params.get("site") || "";
 
 function label(node, value) {
   const literal = document.createElement("code");
@@ -104,11 +107,11 @@ function label(node, value) {
 }
 
 label(document.getElementById("typeLabel"), `.${ext}`);
-label(document.getElementById("siteLabel"), host);
+label(document.getElementById("siteLabel"), site);
 
-document.getElementById("siteRow").hidden = !host;
+document.getElementById("siteRow").hidden = !site;
 document.getElementById("typeRow").hidden = !ext;
-remember.hidden = !host && !ext;
+remember.hidden = !site && !ext;
 
 let sent = false;
 function choose(choice) {

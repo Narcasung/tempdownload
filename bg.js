@@ -104,6 +104,66 @@ function getRules() {
   });
 }
 
+// Multi-part public suffixes, so bbc.co.uk is not reduced to co.uk. The real
+// list is thousands of entries maintained upstream and reissued as sites are
+// added, which is more than a download prompt can justify carrying. What is
+// here covers the common country domains, and the guess below catches the rest.
+const MULTI_SUFFIX = new Set([
+  "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "net.uk", "sch.uk",
+  "com.au", "net.au", "org.au", "edu.au", "gov.au", "id.au",
+  "co.nz", "net.nz", "org.nz",
+  "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp",
+  "com.br", "net.br", "org.br",
+  "com.cn", "net.cn", "org.cn", "gov.cn",
+  "co.in", "net.in", "org.in",
+  "com.mx", "com.ar", "com.tr", "com.sg", "com.hk", "com.tw", "com.my",
+  "com.pl", "com.es", "com.pt", "com.ua", "com.vn", "com.ph",
+  "co.za", "co.kr", "co.il", "co.id", "co.th",
+  // Hosts that hand out a label per customer. Without these, one rule would
+  // answer for every site sharing the platform.
+  "github.io", "gitlab.io", "netlify.app", "vercel.app", "pages.dev",
+  "workers.dev", "herokuapp.com", "web.app", "firebaseapp.com",
+  "r2.cloudflarestorage.com", "s3.amazonaws.com", "blob.core.windows.net",
+]);
+
+// A host cut down to the part a person would call the site. Mirrors bury the
+// name under a bucket and a hash, and remembering the whole thing would mean a
+// new rule every time one rotated.
+function registrable(host) {
+  const name = String(host ?? "");
+  // An address is not a name and has no labels to drop. Cutting one would
+  // change which machine it points at.
+  if (!name || /^[\d.]+$/.test(name) || name.includes(":")) return name;
+
+  const parts = name.split(".").filter(Boolean);
+  if (parts.length <= 2) return parts.join(".");
+
+  // Longest known suffix first, so r2.cloudflarestorage.com is recognised
+  // before cloudflarestorage.com and the label identifying the customer is
+  // kept rather than swallowed.
+  for (let take = Math.min(parts.length - 1, 4); take >= 2; take--) {
+    if (MULTI_SUFFIX.has(parts.slice(-take).join("."))) {
+      return parts.slice(-(take + 1)).join(".");
+    }
+  }
+
+  // Unknown, so guess from the shape: a short label in front of a two letter
+  // country code is almost always a suffix. Guessing wrong keeps a label that
+  // could have gone, which narrows the rule rather than widening it, and a rule
+  // that matches too little is the one worth having.
+  const tld = parts[parts.length - 1];
+  const sld = parts[parts.length - 2];
+  return parts.slice(tld.length === 2 && sld.length <= 3 ? -3 : -2).join(".");
+}
+
+// The page the download came from, not the machine that served the bytes. A
+// mirror is not the site the user was on, and it is the site they mean when
+// they say to remember one. Falls back to the download's own host when the
+// referrer is missing, which happens when a page strips it.
+function siteOf(item) {
+  return registrable(hostOf(item.referrer) || hostOf(item.url) || hostOf(item.finalUrl));
+}
+
 // The last segment only, so archive.tar.gz is remembered as gz, which is what
 // the browser and the user both call it.
 function extOf(filename) {
@@ -116,8 +176,13 @@ function extOf(filename) {
 // lets one site sit outside a broad rule on a file type without that rule
 // having to go.
 function matchRule(item, rules) {
-  const host = hostOf(item.url) || hostOf(item.finalUrl);
-  if (host && rules.hosts[host]) return { choice: rules.hosts[host], why: host };
+  // Two keys, because the same download can be filed under either. A rule made
+  // while the referrer was there still has to answer once it is stripped, and
+  // one made from a mirror still has to answer when a referrer shows up.
+  const sites = [siteOf(item), registrable(hostOf(item.url) || hostOf(item.finalUrl))];
+  for (const site of new Set(sites)) {
+    if (site && rules.hosts[site]) return { choice: rules.hosts[site], why: site };
+  }
 
   const ext = extOf(item.filename);
   if (ext && rules.exts[ext]) return { choice: rules.exts[ext], why: `.${ext}` };
@@ -130,7 +195,7 @@ function matchRule(item, rules) {
 function rememberChoice(item, choice, remember) {
   if (!item || choice === "cancel" || !remember) return;
 
-  const host = remember.host ? hostOf(item.url) || hostOf(item.finalUrl) : "";
+  const host = remember.host ? siteOf(item) : "";
   const ext = remember.ext ? extOf(item.filename) : "";
   if (!host && !ext) return;
 
@@ -267,7 +332,11 @@ function promptUrl(item) {
     id: String(item.id),
     name: baseName(item.filename) || "download",
     size: String(item.totalBytes ?? item.fileSize ?? 0),
+    // Where the bytes come from, which is what the file line reports.
     host: hostOf(item.url) || hostOf(item.finalUrl) || "",
+    // What a site rule would be keyed on, which is not the same thing: a mirror
+    // serves the file, the page the user was on is the site.
+    site: siteOf(item),
     // Temp and Cancel work on any download. Save as is the only branch that
     // needs the URL a second time, so the prompt is told whether to offer it.
     reissue: canReissue(item.url) ? "1" : "0",
