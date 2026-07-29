@@ -6,11 +6,9 @@ const id = Number(params.get("id"));
 // were torn down the download would hang with no way to answer it.
 const port = chrome.runtime.connect({ name: `prompt-${id}` });
 
-// The download ran out of time while this was on screen. Nothing here is worth
-// answering any more, so the popup becomes the settings view, which is what it
-// would have been had the prompt never appeared.
+// The download ran out of time while this was on screen.
 port.onMessage.addListener((msg) => {
-  if (msg?.type === "tempdl-timeout") location.replace("options.html");
+  if (msg?.type === "tempdl-timeout") timedOut();
   // More downloads started while this was on screen. They are covered by
   // whatever is answered here, so the wording has to say so.
   if (msg?.type === "tempdl-count") showWaiting(msg.count);
@@ -24,6 +22,10 @@ port.onMessage.addListener((msg) => {
 // download actually expires.
 const countdown = document.getElementById("countdown");
 const countdownBar = countdown.firstElementChild;
+const status = document.getElementById("status");
+const tempButton = document.getElementById("temp");
+const saveButton = document.getElementById("save");
+const cancelButton = document.getElementById("cancel");
 
 function startCountdown(ms, total) {
   if (!(ms > 0) || !(total > 0)) return;
@@ -61,7 +63,7 @@ function format(n) {
 // still stands, it just cannot ask where, so the button says what it will
 // actually do instead of promising a dialog.
 if (params.get("reissue") !== "1") {
-  document.getElementById("save").textContent = "Save (Download Folder)";
+  saveButton.textContent = "Save (Download Folder)";
   document.getElementById("noSaveAs").hidden = false;
 }
 
@@ -125,13 +127,36 @@ function choose(choice) {
   window.close();
 }
 
-document.getElementById("temp").addEventListener("click", () => choose("temp"));
-document.getElementById("save").addEventListener("click", () => choose("save"));
-document.getElementById("cancel").addEventListener("click", () => choose("cancel"));
+tempButton.addEventListener("click", () => choose("temp"));
+saveButton.addEventListener("click", () => choose("save"));
+cancelButton.addEventListener("click", () => choose("cancel"));
+
+// The question stays on screen rather than being replaced by the settings, so
+// what timed out is still named and the reason it can no longer be answered is
+// written under the controls that stopped working. Everything is disabled
+// rather than removed: a prompt that lost its buttons would look broken, and
+// the answer has already been given on the user's behalf.
+function timedOut() {
+  // Nothing here can answer any more, and the guard is what makes the keyboard
+  // inert along with the buttons.
+  sent = true;
+
+  for (const control of [tempButton, saveButton, cancelButton, rememberSite, rememberType]) {
+    control.disabled = true;
+  }
+  remember.classList.add("spent");
+  status.textContent = "Timed out. The download was cancelled.";
+  status.classList.add("bad");
+}
 
 document.addEventListener("keydown", (e) => {
+  // Already answered, so closing is all that is left.
+  if (sent) {
+    if (e.key === "Escape") window.close();
+    return;
+  }
   if (e.key === "Escape") choose("cancel");
   if (e.key === "Enter") choose("temp");
 });
 
-document.getElementById("temp").focus();
+tempButton.focus();

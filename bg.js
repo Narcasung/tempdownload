@@ -241,8 +241,11 @@ function ask(item, suggest) {
     const port = showing === null ? null : ports.get(showing);
     resolveAll("cancel");
 
-    chrome.storage.local.set({ toast: { text: "Download timed out", at: Date.now() } });
-    port?.postMessage({ type: "tempdl-timeout" });
+    // Told where it will actually be read. A prompt still on screen says it in
+    // place, under the buttons it just disabled. With nothing on screen the
+    // message waits for whenever the popup is next opened.
+    if (port) port.postMessage({ type: "tempdl-timeout" });
+    else chrome.storage.local.set({ toast: { text: "Download timed out", at: Date.now() } });
   }, CHOICE_TIMEOUT_MS);
   pending.set(item.id, entry);
 
