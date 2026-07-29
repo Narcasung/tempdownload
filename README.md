@@ -23,14 +23,30 @@ browser's download settings.
 Nothing is sent anywhere. There is no network access, no analytics, no remote
 code.
 
-## Known limits
+## Browser limits
+
+Nothing an extension can work around. Each of these is the browser refusing,
+not the extension declining.
 
 - The temp folder cannot be outside of the browser's download directory.
+  A suggested path is always relative to that directory, and an absolute one is
+  ignored, so the folder is configured as a name rather than picked as a path.
 - Only files still present in the browser's download history can be swept.
   Anything you clear from history survives in the temp folder.
   Anything you put there manually will never be detected nor deleted.
-- Downloads have a set 15 seconds timeout before being automatically accepted by the browser.
-  To counteract this, the script sets a 12 seconds timeout before automatically cancelling downloads.
-- Blob downloads cannot be handled by the script's choose directory dialog.
-  They can only be saved in the download folder.
-- The extension cannot open files for you.
+  The File System Access API can read a folder and would lift this, but the
+  permission does not survive a browser restart and cannot be renewed without a
+  click, so the wipe at startup can never use it.
+- The browser waits 15 seconds for an answer, then places the file in the
+  download directory itself and ignores whatever is chosen afterwards. To stay
+  ahead of it, the extension cancels a download that has gone 14 seconds without
+  a choice.
+
+## What this extension does not do
+
+- Blob downloads cannot be offered a folder. They are built by the page itself
+  and cannot be fetched a second time from here, so the only route would be to
+  read the file inside the page and pass every byte through the extension. That
+  means holding the whole download in memory and transferring it twice, which is
+  not worth it for a folder choice. Those downloads keep their original transfer
+  and land in the download folder under their proper name.

@@ -11,12 +11,15 @@
 // no way to write to an arbitrary absolute location, which is why the temp
 // folder is configured as a NAME rather than picked as a path. See options.html.
 //
-// Nothing here launches files. chrome.downloads.open() requires a user gesture
-// that cannot survive the transfer.
+// Nothing here launches files. The browser's own download button already opens
+// them, and doing it again from the popup would only be a second way in.
 //
-// Cleanup goes through the download history, not the filesystem. The File
-// System Access API would allow a true folder wipe, but it is missing entirely
-// in some Chromium browsers, so files whose history entry is gone stay on disk.
+// Cleanup goes through the download history, not the filesystem, so files whose
+// history entry is gone stay on disk. The File System Access API can read the
+// folder and was tried: a directory handle does survive in IndexedDB and does
+// work in this worker, but its permission does not survive a browser restart,
+// and renewing it needs a user gesture that a browser start has none of. That
+// made the wipe depend on a click every session, so it was dropped.
 
 const DEFAULT_FOLDER = "_Temp";
 
@@ -29,7 +32,7 @@ const DEFAULT_FOLDER = "_Temp";
 // the window to decide is 15 seconds from the moment the download starts, not
 // from the moment its prompt is seen. That is why one prompt answers for every
 // download waiting rather than each getting a turn.
-const CHOICE_TIMEOUT_MS = 12000;
+const CHOICE_TIMEOUT_MS = 14000;
 
 // suggest() is a live callback, so it cannot be serialised to storage and this
 // map is unavoidably in-memory. A port held open by the prompt window keeps the
