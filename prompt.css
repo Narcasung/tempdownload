@@ -38,6 +38,13 @@
   display: none !important;
 }
 
+/* The popup is sized from the root element, so an intrinsic width set only on
+   the body leaves the window at whatever it already was and the content is cut
+   off at the edge rather than widening it. */
+html {
+  width: min-content;
+}
+
 body {
   margin: 0;
   padding: 16px 18px;
@@ -100,15 +107,26 @@ body {
 }
 
 /* Both pages are shown as the toolbar popup, which sizes to its content rather
-   than to a window. */
-body.options {
-  width: 380px;
+   than to a window.
+   A button whose label wrapped would make the row taller without making the
+   popup any narrower, so the labels never break and the width follows them
+   instead. min-content is what measures that: every text block on these pages
+   can break anywhere, so it contributes almost nothing, and the button row is
+   left as the only thing with a real minimum. The nominal width is the floor,
+   and the ceiling keeps a long row inside what the browser will draw. */
+body.options,
+body.prompt {
+  width: min-content;
+  max-width: 780px;
   min-height: 0;
 }
 
+body.options {
+  min-width: 380px;
+}
+
 body.prompt {
-  width: 400px;
-  min-height: 0;
+  min-width: 400px;
 }
 
 .field {
@@ -252,8 +270,15 @@ code {
   gap: 8px;
 }
 
+/* Shrinking is what would force a label to wrap, so the row keeps its full
+   width and the popup widens around it. */
+.actions button {
+  flex: none;
+}
+
 button {
   font: inherit;
+  white-space: nowrap;
   padding: 6px 16px;
   border-radius: 4px;
   border: 1px solid var(--border);
