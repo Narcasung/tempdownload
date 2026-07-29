@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Options</title>
+    <link rel="stylesheet" href="prompt.css" />
+  </head>
+  <body class="options">
+    <header class="titlebar">
+      <button class="icon" id="back" title="Back">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 5l-7 7 7 7" />
+        </svg>
+      </button>
+      <span class="title">Options</span>
+    </header>
+
+    <p class="lead" id="intro" hidden>
+      Downloads you mark as temporary are kept in a folder of their own, and
+      deleted every time your browser starts.
+    </p>
+
+    <p class="alert" id="setupAlert" hidden>
+      &ldquo;Ask where to save each file before downloading&rdquo; in your
+      browser&rsquo;s download settings need to be turned off for this extension
+      to work correctly.
+    </p>
+
+    <div class="field">
+      <span class="label" id="label">Temporary Folder:</span>
+      <div class="row">
+        <div class="current" id="current" hidden></div>
+        <input id="folder" type="text" spellcheck="false" autocomplete="off" />
+        <button id="open" hidden title="Open this folder in your file manager">
+          Open
+        </button>
+      </div>
+    </div>
+
+    <p class="hint" id="preview" hidden></p>
+
+    <p class="warn" id="dirWarning" hidden>
+      This folder is created inside your browser&rsquo;s download directory. If
+      you change this download directory later in your browser&rsquo;s settings,
+      the old temp folder will be <b>orphaned</b>. This extension will no longer
+      be able to find it or clear it, and its contents stay on disk until you
+      delete them yourself.
+    </p>
+
+    <div class="actions inline">
+      <button id="clear">Clear now</button>
+      <button id="change" hidden>Change temp folder</button>
+      <button id="save" class="primary">Save</button>
+    </div>
+
+    <p class="status" id="status"></p>
+
+    <hr class="divider" id="divider" />
+
+    <div class="field" id="remembered">
+      <div class="headline">
+        <span class="label">Remembered choices</span>
+        <button class="icon trailing danger" id="forgetAll" hidden title="Forget everything">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6h16M9.5 6V4h5v2M6.5 6l1 14h9l1-14" />
+          </svg>
+        </button>
+      </div>
+
+      <p class="hint" id="empty" hidden>
+        Nothing is remembered yet.
+      </p>
+
+      <div class="scroll" id="scroll">
+        <div class="field" id="siteBlock" hidden>
+          <span class="sublabel">Sites</span>
+          <div class="rules" id="sites"></div>
+        </div>
+
+        <div class="field" id="typeBlock" hidden>
+          <span class="sublabel">File types</span>
+          <div class="rules" id="types"></div>
+        </div>
+      </div>
+
+      <p class="hint" id="precedence" hidden>
+        A site rule takes precedence over a file type rule.
+      </p>
+    </div>
+
+    <p class="status" id="ruleStatus"></p>
+
+    <script src="settings.js"></script>
+  </body>
+</html>

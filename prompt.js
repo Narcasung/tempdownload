@@ -86,19 +86,10 @@ showWaiting(Number(params.get("count")) || 1);
 const remember = document.getElementById("remember");
 const rememberSite = document.getElementById("rememberSite");
 const rememberType = document.getElementById("rememberType");
-const rememberNote = document.getElementById("rememberNote");
 
 document.getElementById("siteRow").hidden = !host;
 document.getElementById("typeRow").hidden = !params.get("ext");
 remember.hidden = !host && !params.get("ext");
-
-// Said only once a box is ticked, since until then it answers a question
-// nobody asked.
-for (const box of [rememberSite, rememberType]) {
-  box.addEventListener("change", () => {
-    rememberNote.hidden = !(rememberSite.checked || rememberType.checked);
-  });
-}
 
 let sent = false;
 function choose(choice) {

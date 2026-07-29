@@ -99,10 +99,45 @@ body {
   color: var(--fg);
 }
 
-/* Back sits where it points, at the start of the line. Anything else in a
-   header belongs at the far end, away from the name. */
-.titlebar .trailing {
+/* The one control here that takes more than one thing away, so it carries the
+   colour that says so rather than sitting quietly among the others. */
+.icon.danger,
+.icon.danger:hover {
+  color: var(--danger);
+}
+
+.icon.danger:hover {
+  border-color: var(--danger);
+}
+
+/* Armed, waiting on the second click. Filled rather than outlined, so the state
+   is visible without having to read the line underneath. */
+.icon.danger.armed {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+
+/* Back sits where it points, at the start of the line. Anything else on a
+   heading belongs at the far end, away from the words. */
+.trailing {
   margin-left: auto;
+}
+
+/* A heading with a control on it. Not .row, which stretches its children to
+   the same height and would pull a lone icon out of shape. */
+.headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Bled to the popup edges so it reads as the page changing subject rather than
+   as a line drawn inside one. */
+.divider {
+  height: 1px;
+  border: 0;
+  margin: 2px -18px;
+  background: var(--border);
 }
 
 .file {
@@ -276,6 +311,31 @@ input[type="text"]:focus-visible {
   gap: 4px;
 }
 
+/* Nothing prunes remembered choices, so the list is capped and scrolls rather
+   than growing the popup without limit. The cap is a fixed height rather than a
+   share of the viewport: a popup is sized from its own content, so a viewport
+   unit here would be measured against the thing it is meant to be limiting.
+   200px is about a third of the 600px a popup is allowed to reach. */
+.scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  /* A list that has run out is not a reason to start scrolling the page behind
+     it. */
+  overscroll-behavior: contain;
+}
+
+.scroll {
+  scrollbar-width: thin;
+}
+
+.sublabel {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .rule {
   display: flex;
   align-items: center;
@@ -344,6 +404,12 @@ code {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Buttons that belong to the section above them rather than to the page, so
+   they sit where they are written instead of being pushed to the bottom. */
+.actions.inline {
+  margin-top: 0;
 }
 
 /* Shrinking is what would force a label to wrap, so the row keeps its full
